@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Decoder - System Architecture</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        
+        .title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 40px;
+        }
+        
+        .diagram {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .layer {
+            text-align: center;
+        }
+        
+        .layer-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+        
+        .component {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .component:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .frontend { border-color: #4299e1; }
+        .backend { border-color: #48bb78; }
+        .services { border-color: #ed8936; }
+        
+        .component-name {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+        
+        .component-desc {
+            font-size: 12px;
+            color: #718096;
+        }
+        
+        .arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #a0aec0;
+            margin: 20px 0;
+        }
+        
+        .flow {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .flow-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .flow-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .step {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            flex: 1;
+            min-width: 180px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .step-number {
+            background: #4299e1;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-weight: bold;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+        
+        .step-desc {
+            font-size: 12px;
+            color: #718096;
+        }
+        
+        .arrow-right {
+            color: #4299e1;
+            font-size: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .diagram {
+                grid-template-columns: 1fr;
+            }
+            
+            .flow-steps {
+                flex-direction: column;
+            }
+            
+            .arrow-right {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">🔬 Research Decoder - System Architecture</div>
+        
+        <div class="diagram">
+            <!-- Frontend Layer -->
+            <div class="layer">
+                <div class="layer-title">Frontend (Next.js)</div>
+                
+                <div class="component frontend">
+                    <div class="component-name">Dashboard</div>
+                    <div class="component-desc">Card-based layout for research reports</div>
+                </div>
+                
+                <div class="component frontend">
+                    <div class="component-name">Report Reader</div>
+                    <div class="component-desc">Magazine-style reading experience</div>
+                </div>
+                
+                <div class="component frontend">
+                    <div class="component-name">Topic Manager</div>
+                    <div class="component-desc">User preference interface</div>
+                </div>
+                
+                <div class="component frontend">
+                    <div class="component-name">Auth System</div>
+                    <div class="component-desc">User accounts & profiles</div>
+                </div>
+            </div>
+            
+            <!-- Backend Layer -->
+            <div class="layer">
+                <div class="layer-title">Backend (Python)</div>
+                
+                <div class="component backend">
+                    <div class="component-name">Agent Orchestrator</div>
+                    <div class="component-desc">Manages overnight processing</div>
+                </div>
+                
+                <div class="component backend">
+                    <div class="component-name">API Gateway</div>
+                    <div class="component-desc">RESTful endpoints</div>
+                </div>
+                
+                <div class="component backend">
+                    <div class="component-name">Paper Processor</div>
+                    <div class="component-desc">AI analysis & translation</div>
+                </div>
+                
+                <div class="component backend">
+                    <div class="component-name">Database</div>
+                    <div class="component-desc">User data & processed content</div>
+                </div>
+            </div>
+            
+            <!-- External Services -->
+            <div class="layer">
+                <div class="layer-title">External Services</div>
+                
+                <div class="component services">
+                    <div class="component-name">Agno</div>
+                    <div class="component-desc">Agent orchestration</div>
+                </div>
+                
+                <div class="component services">
+                    <div class="component-name">Exa</div>
+                    <div class="component-desc">Research paper discovery</div>
+                </div>
+                
+                <div class="component services">
+                    <div class="component-name">Firecrawl</div>
+                    <div class="component-desc">PDF content extraction</div>
+                </div>
+                
+                <div class="component services">
+                    <div class="component-name">OpenAI</div>
+                    <div class="component-desc">GPT-4 + GPT-image-1</div>
+                </div>
+                
+                <div class="component services">
+                    <div class="component-name">Mem0</div>
+                    <div class="component-desc">User memory & preferences</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flow">
+            <div class="flow-title">🌙 Overnight Agent Workflow</div>
+            
+            <div class="flow-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Discovery</div>
+                    <div class="step-desc">Exa finds latest papers in user topics</div>
+                </div>
+                
+                <div class="arrow-right">→</div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Extract</div>
+                    <div class="step-desc">Firecrawl processes PDF content</div>
+                </div>
+                
+                <div class="arrow-right">→</div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Analyze</div>
+                    <div class="step-desc">GPT-4 translates to plain English</div>
+                </div>
+                
+                <div class="arrow-right">→</div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-title">Illustrate</div>
+                    <div class="step-desc">GPT-image-1 creates contextual visuals</div>
+                </div>
+                
+                <div class="arrow-right">→</div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-title">Deliver</div>
+                    <div class="step-desc">Reports ready in user dashboard</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
