@@ -1,0 +1,2774 @@
+# Health Check
+Source: https://docs.chunkr.ai/api-references/health/health-check
+
+https://api.chunkr.ai/docs/openapi.json get /health
+Confirmation that the service can respond to requests
+
+
+
+# Cancel Task
+Source: https://docs.chunkr.ai/api-references/task/cancel-task
+
+https://api.chunkr.ai/docs/openapi.json get /api/v1/task/{task_id}/cancel
+Cancel a task that hasn't started processing yet:
+- For new tasks: Status will be updated to `Cancelled`
+- For updating tasks: Task will revert to the previous state
+
+Requirements:
+- Task must have status `Starting`
+
+
+
+# Create Task
+Source: https://docs.chunkr.ai/api-references/task/create-task
+
+https://api.chunkr.ai/docs/openapi.json post /api/v1/task/parse
+Queues a document for processing and returns a TaskResponse containing:
+- Task ID for status polling
+- Initial configuration
+- File metadata
+- Processing status
+- Creation timestamp
+- Presigned URLs for file access
+
+The returned task will typically be in a `Starting` or `Processing` state.
+Use the `GET /task/{task_id}` endpoint to poll for completion.
+
+
+
+# Delete Task
+Source: https://docs.chunkr.ai/api-references/task/delete-task
+
+https://api.chunkr.ai/docs/openapi.json delete /api/v1/task/{task_id}
+Delete a task by its ID.
+
+Requirements:
+- Task must have status `Succeeded` or `Failed`
+
+
+
+# Get Task
+Source: https://docs.chunkr.ai/api-references/task/get-task
+
+https://api.chunkr.ai/docs/openapi.json get /api/v1/task/{task_id}
+Retrieves detailed information about a task by its ID, including:
+- Processing status
+- Task configuration
+- Output data (if processing is complete)
+- File metadata (name, page count)
+- Timestamps (created, started, finished)
+- Presigned URLs for accessing files
+
+This endpoint can be used to:
+1. Poll the task status during processing
+2. Retrieve the final output once processing is complete
+3. Access task metadata and configuration
+
+
+
+# Update Task
+Source: https://docs.chunkr.ai/api-references/task/update-task
+
+https://api.chunkr.ai/docs/openapi.json patch /api/v1/task/{task_id}/parse
+Updates an existing task's configuration and reprocesses the document.
+The original configuration will be used for all values that are not provided in the update.
+
+Requirements:
+- Task must have status `Succeeded` or `Failed`
+- New configuration must be different from the current one
+
+The returned task will typically be in a `Starting` or `Processing` state.
+Use the `GET /task/{task_id}` endpoint to poll for completion.
+
+
+
+# Get Tasks
+Source: https://docs.chunkr.ai/api-references/tasks/get-tasks
+
+https://api.chunkr.ai/docs/openapi.json get /api/v1/tasks
+Retrieves a list of tasks
+
+Example usage:
+`GET /api/v1/tasks?page=1&limit=10&include_chunks=false`
+
+
+
+# Chunking
+Source: https://docs.chunkr.ai/docs/features/chunking
+
+Chunking
+
+Chunking is the process of splitting a document into smaller segments.
+These chunks can be used for semantic search, and better LLM performance.
+
+By leveraging layout analysis, we create intelligent chunks that preserve document structure and context. Our algorithm:
+
+* Respects natural document boundaries (paragraphs, sections)
+* Maintains semantic relationships between segments
+* Optimizes chunk size for LLM processing
+
+You can review the implementation of our chunking algorithm in our [GitHub repository](https://github.com/lumina-ai-inc/chunkr/blob/main/core/src/utils/services/chunking.rs#L113).
+
+Here is an example that will chunk the document into 512 words per chunks. These values are also the defaults, so you don't need to specify them.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      ChunkProcessing,
+      Configuration
+      Tokenizer,
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      chunk_processing=ChunkProcessing(
+          ignore_headers_and_footers=True, 
+          target_length=512,
+          tokenizer=Tokenizer.WORD
+      ),
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "chunk_processing": {
+        "ignore_headers_and_footers": false,
+        "target_length": 512,
+        "tokenizer": {
+          "Enum": "Word"
+        }
+      }
+    }'
+  ```
+</CodeGroup>
+
+### Defaults
+
+* `ignore_headers_and_footers`: True
+* `target_length`: 512
+* `tokenizer`: `Word`
+
+## Tokenizer
+
+Chunkr supports a large number of tokenizers. You can use our predefined ones or specify any tokenizer from huggingface.
+
+### Predefined Tokenizers
+
+The predefined tokenizers are enum values and can be used as follows:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      ChunkProcessing,
+      Configuration
+      Tokenizer,
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      chunk_processing=ChunkProcessing(
+              tokenizer=Tokenizer.CL100K_BASE
+      ),
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "chunk_processing": {
+        "tokenizer": {
+          "Enum": "Cl100kBase"
+        }
+      }
+    }'
+  ```
+</CodeGroup>
+
+Available options:
+
+* `Word`: Split by words
+* `Cl100kBase`: For OpenAI models (e.g. GPT-3.5, GPT-4, text-embedding-ada-002)
+* `XlmRobertaBase`: For RoBERTa-based multilingual models
+* `BertBaseUncased`: BERT base uncased tokenizer
+
+You can also define the tokenizer enum as a string in the python SDK. Here is an example where the string will be converted to the enum value.
+
+```python Python
+from chunkr_ai import Chunkr
+from chunkr_ai.models import (
+    ChunkProcessing,
+    Configuration
+    Tokenizer,
+)
+
+chunkr = Chunkr()
+
+chunkr.upload("path/to/file", Configuration(
+    chunk_processing=ChunkProcessing(
+            tokenizer="Word"
+    ),
+))
+```
+
+### Hugging Face Tokenizers
+
+Use any Hugging Face tokenizer by providing its model ID as a string (e.g. "facebook/bart-large", "Qwen/Qwen-tokenizer", etc.)
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      ChunkProcessing,
+      Configuration
+      Tokenizer,
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      chunk_processing=ChunkProcessing(
+              tokenizer="Qwen/Qwen-tokenizer"
+      ),
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "chunk_processing": {
+        "tokenizer": {
+          "String": "Qwen/Qwen-tokenizer"
+        }
+      }
+    }'
+  ```
+</CodeGroup>
+
+## Calculating Chunk Lengths With Embed Sources
+
+When calculating chunk lengths and performing tokenization, we use the text from the `embed` field in each chunk object. This field contains the text that will be compared against the target length.
+You can configure what text goes into the `embed` field by setting the `embed_sources` parameter in your segment processing configuration. This parameter is specified under `segment_processing.{segment_type}` in your configuration.
+You can see more information about the `embed_sources` parameter in the [Segment Processing](/features/segment-processing) section.
+
+Here's an example of customizing the `embed` field content for Picture segments. By configuring `embed_sources`, you can include both the LLM-generated output and Chunkr's markdown output in the `embed` field for Pictures, while other segment types will continue using just the default Markdown content.
+Additionally, we can use `CL100K_BASE` tokenizer to configure this for OpenAI models.
+
+This means for this configuration, when calculating chunk lengths:
+
+* Picture segments: Length will be based on both the LLM summary and Markdown content
+* All other segments: Length will be based only on the Markdown content
+* The tokenizer will be `CL100K_BASE`
+
+<CodeGroup>
+  ```python Python    
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      ChunkProcessing,
+      Configuration,
+      SegmentProcessing,
+      Tokenizer,
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      chunk_processing=ChunkProcessing(
+          tokenizer=Tokenizer.CL100K_BASE
+      ),
+      segment_processing=SegmentProcessing(
+          Picture=SegmentProcessingPicture(
+              llm="Summarize the key information presented",
+              embed_sources=[EmbedSource.MARKDOWN, EmbedSource.LLM]
+          )
+      )
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "chunk_processing": {
+        "tokenizer": {
+          "Enum": "Cl100kBase"
+        }
+      },
+      "segment_processing": {
+        "Picture": {
+          "llm": "Summarize the key information presented",
+          "embed_sources": ["Markdown", "LLM"]
+          }
+      }
+    }'
+  ```
+</CodeGroup>
+
+By combining the `embed_sources` parameter with the `tokenizer` parameter, you can customize the chunk lengths and tokenization for different segment types.
+This allows you to have very powerful chunking configurations for your documents.
+
+
+# Error Handling
+Source: https://docs.chunkr.ai/docs/features/error-handling
+
+Handle errors in Chunkr AI API
+
+Chunkr AI API provides a configurable approach to error handling during document processing.
+You can control how the system responds to errors that occur during various processing stages.
+
+## Error Handling Strategy
+
+The `ErrorHandlingStrategy` configuration allows you to specify how the system should respond when errors occur during document processing.
+
+```python
+from chunkr_ai import Chunkr
+from chunkr_ai.models import Configuration, ErrorHandlingStrategy
+
+# Create config with Continue error handling
+config = Configuration(
+    error_handling=ErrorHandlingStrategy.CONTINUE
+)
+
+# Upload document with this configuration
+chunkr = Chunkr()
+response = await chunkr.upload("path/to/file", config)
+```
+
+### Available Strategies
+
+| Strategy                         | Description                                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ErrorHandlingStrategy.FAIL`     | Default behavior. Processing stops immediately when any error occurs. The task will fail and return status `FAILED`.                           |
+| `ErrorHandlingStrategy.CONTINUE` | Processing continues despite non-critical errors. The system will make reasonable attempts to recover and continue with the remaining content. |
+
+## How Continue Mode Works
+
+When you set `error_handling=ErrorHandlingStrategy.CONTINUE`, the system will attempt to gracefully handle various types of errors:
+
+### LLM Processing Errors
+
+If a segment encounters an LLM error:
+
+* The system will skip that specific segment instead of failing the entire task
+* Processing continues with the remaining segments
+
+If there is a fallback model configured, the system will use it to process the segment first, if that fails then error handling will continue.
+See here in [LLM Processing](/docs/features/llm-processing) how to configure a fallback model.
+
+### Layout Analysis Errors
+
+When using `Continue` mode during layout analysis:
+
+* If a page encounters layout detection problems, it defaults to segment type "Page"
+* This ensures the content is still accessible even if optimal segmentation fails
+* The page's content will be processed as a single segment
+
+### OCR Strategy Fallbacks
+
+In `Continue` mode with OCR processing:
+
+* If OCR extraction encounters errors, it falls back to using the document's text layer
+* This behaves similarly to `OcrStrategy.AUTO` mode
+* Ensures text content is still available even when OCR processing fails
+
+## Example Usage
+
+<CodeGroup>
+  ```python Basic Example
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import Configuration, ErrorHandlingStrategy
+
+  chunkr = Chunkr()
+
+  # Use Continue strategy for robust processing
+  config = Configuration(
+      error_handling=ErrorHandlingStrategy.CONTINUE
+  )
+
+  response = await chunkr.upload("path/to/document.pdf", config)
+  # Processing will continue despite non-critical errors
+  ```
+
+  ```python Combined with Other Settings
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration, 
+      ErrorHandlingStrategy,
+      LlmProcessing,
+      FallbackStrategy
+  )
+
+  chunkr = Chunkr()
+
+  # Comprehensive configuration with error handling
+  config = Configuration(
+      error_handling=ErrorHandlingStrategy.CONTINUE,
+      llm_processing=LlmProcessing(
+          model_id="gemini-pro-2.5",
+          fallback_strategy=FallbackStrategy.model("claude-3.7-sonnet"),
+          max_completion_tokens=4096
+      )
+  )
+
+  response = await chunkr.upload("path/to/document.pdf", config)
+  # Will continue processing even if some LLM calls fail
+  ```
+
+  ```bash cURL
+  curl -X POST \
+      --url https://api.chunkr.ai/api/v1/task/parse \
+      --header "Authorization: YOUR_API_KEY" \
+      --header "Content-Type: application/json" \
+      --data '{
+          "file": "base64_or_url_to_file",
+          "error_handling": "CONTINUE",
+          "llm_processing": {
+              "fallback_strategy": {"model": "gemini-flash-2.0"},
+              "model_id": "claude-3.7-sonnet"
+          }
+      }'
+  ```
+</CodeGroup>
+
+## When to Use Continue Mode
+
+Consider using `ErrorHandlingStrategy.CONTINUE` when partial results are better than completely failed processing.
+
+For critical applications where accuracy is paramount, you may prefer the default `ErrorHandlingStrategy.FAIL` to ensure you're alerted to any processing issues.
+
+
+# Segmentation Strategy
+Source: https://docs.chunkr.ai/docs/features/layout-analysis/segmentation_strategy
+
+Controls the segmentation strategy
+
+The chunkr AI API allows you to specify a `segmentation_strategy` for each document. This strategy controls how the document is segmented.
+
+We have two strategies:
+
+* `LayoutAnalysis`: Run our state-of-the-art layout analysis model to identify the layout elements. This is the default strategy.
+* `Page`: Each segment is a page.
+
+This is how you can configure the segmentation strategy:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import Configuration, SegmentationStrategy
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      segmentation_strategy=SegmentationStrategy.LAYOUT_ANALYSIS 
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "segmentation_strategy": "LayoutAnalysis"
+    }'
+  ```
+</CodeGroup>
+
+## When to use each strategy
+
+For most documents, we recommend using the `LayoutAnalysis` strategy. This will give you the best results.
+
+Use `Page` for:
+
+* Faster processing speed when you need quick results and layout isn't critical
+* Documents with unusual layouts that confuse the layout analysis model
+* If the layout is complex but not very information dense, `Page` + VLM can generate surprisingly good HTML and markdown (see [Segment Processing](/docs/features/segment-processing)).
+
+
+# What is Layout Analysis?
+Source: https://docs.chunkr.ai/docs/features/layout-analysis/what
+
+Understand the importance of layout analysis in document processing
+
+Layout analysis is a crucial step in document processing that involves analyzing and understanding the spatial arrangement of content within a document.
+It helps identify and classify different regions of a document, such as `text`, `table`, `headers`, `footers`, and `pictures`.
+
+Basically, it tells us where and what is in the document.
+
+## Why is Layout Analysis Important?
+
+Layout analysis serves several key purposes:
+
+* **Structure Recognition**: It helps identify the logical structure and reading order of a document
+* **Data Extraction**: By identifying specific regions (like tables, headers, or paragraphs), we can use specialized extraction methods for each type, improving accuracy
+* **Better Chunking**: Layout elements allows us to identify sections of the document and generate better chunks.
+* **Citations**: It allows LLMs to cite the correct region of the document, which can then be highlighted for a better experience.
+
+<img src="https://mintlify.s3.us-west-1.amazonaws.com/lumina-53fcea44/assets/layout_analysis_example.webp" alt="Layout Analysis" style={{borderRadius: "10px"}} />
+
+## Segment Types
+
+Chunkr uses a two way vision-grid transformer to identify the layout of the document.
+We support the following segment types:
+
+* **Caption**: Text describing figures, tables, or other visual elements
+* **Footnote**: References or additional information at the bottom of pages
+* **Formula**: Mathematical or scientific equations
+* **List Item**: Individual items in bulleted or numbered lists
+* **Page**: Entire page (`segmentation_strategy=Page`)
+* **Page Footer**: Content that appears at the bottom of each page
+* **Page Header**: Content that appears at the top of each page
+* **Picture**: Images, diagrams, or other visual elements
+* **Section Header**: Headers that divide the document into sections
+* **Table**: Structured data arranged in rows and columns
+* **Text**: Regular paragraph text
+* **Title**: Main document title
+
+
+# LLM Processing
+Source: https://docs.chunkr.ai/docs/features/llm-processing
+
+Process documents with LLMs
+
+Chunkr AI API allows you to configure the LLMs that will be used to process the documents.
+The LLMs configuration is applied to your segments during the `segment_processing` step, click [here](./segment-processing) to learn more.
+
+This is how you can configure the LLMs:
+
+```python
+llm_processing=LlmProcessing(
+    model_id="gemini-pro-2.5",
+    fallback_strategy=FallbackStrategy.model("gemini-flash-2.0"),
+    max_completion_tokens=4096,
+    temperature=0.0
+)
+```
+
+## LLM Processing Options
+
+The `LlmProcessing` configuration controls which language models are used for processing segments and provides fallback strategies if the primary model fails.
+
+| Field                   | Type             | Description                                                                                        | Default                             |
+| ----------------------- | ---------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `model_id`              | String           | The ID of the model to use for processing. If not provided, the system default model will be used. | [System default](#available-models) |
+| `fallback_strategy`     | FallbackStrategy | Strategy to use if the primary model fails.                                                        | [System default](#available-models) |
+| `max_completion_tokens` | Integer          | Maximum number of tokens to generate in the model response.                                        | None                                |
+| `temperature`           | Float            | Controls randomness in model responses (0.0 = deterministic, higher = more random).                | 0.0                                 |
+
+## Fallback Strategies
+
+When working with language models, reliability is important. Chunkr provides three fallback strategies to handle cases when your primary model fails:
+
+* `FallbackStrategy.none()`: No fallback will be used. If the primary model fails, the operation will return an error.
+* `FallbackStrategy.default()`: Use the system default fallback model.
+* `FallbackStrategy.model("model-id")`: Specify a particular model ID to use as a fallback. This gives you explicit control over which alternative model should be used.
+
+## Example Usage
+
+Here's how to configure LLM processing in different scenarios:
+
+<CodeGroup>
+  ```python Simple Configuration
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration,
+      LlmProcessing,
+      FallbackStrategy
+  )
+
+  chunkr = Chunkr()
+
+  # Use Gemini Pro 2.5 with no fallback strategy
+  config = Configuration(
+      llm_processing=LlmProcessing(
+          model_id="gemini-pro-2.5",
+          fallback_strategy=FallbackStrategy.none(),
+          temperature=0.0
+      )
+  )
+
+  chunkr.upload("path/to/file", config)
+  ```
+
+  ```python With Fallback Model
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration,
+      LlmProcessing,
+      FallbackStrategy
+  )
+
+  chunkr = Chunkr()
+
+  # Use Claude 3.7 Sonnet with Gemini Flash 2.0 as fallback
+  config = Configuration(
+      llm_processing=LlmProcessing(
+          model_id="claude-3.7-sonnet",
+          fallback_strategy=FallbackStrategy.model("gemini-flash-2.0"),
+          max_completion_tokens=4096,
+          temperature=0.2
+      )
+  )
+
+  chunkr.upload("path/to/file", config)
+  ```
+
+  ```bash cURL
+  curl -X POST \
+      --url https://api.chunkr.ai/api/v1/task/parse \
+      --header "Authorization: YOUR_API_KEY" \
+      --header "Content-Type: application/json" \
+      --data '{
+          "file": "base64_or_url_to_file",
+          "llm_processing": {
+              "fallback_strategy": {"model": "gemini-flash-2.0"},
+              "max_completion_tokens": 4096,
+              "model_id": "gemini-flash-2.0",
+              "temperature": 0
+          }
+      }'
+  ```
+</CodeGroup>
+
+## Available Models
+
+The following models are currently available for use with Chunkr:
+
+<iframe
+  srcDoc={`
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Available LLM Models</title>
+      <style>
+          body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+              margin: 0;
+              padding: 20px;
+              color: #333;
+          }
+          table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+              border-radius: 8px;
+              font-size: 14px;
+          }
+          th {
+              background: #f5f5f5;
+              padding: 10px;
+              text-align: left;
+              border-bottom: 1px solid #ddd;
+              font-weight: 600;
+          }
+          td {
+              padding: 10px;
+              border-bottom: 1px solid #ddd;
+          }
+          .centered {
+              text-align: center;
+          }
+          .model-id {
+              font-family: monospace;
+              background: #f7f7f7;
+              padding: 2px 4px;
+              border-radius: 4px;
+              display: inline-block;
+              vertical-align: middle;
+          }
+          .badge {
+              display: inline-block;
+              padding: 2px 8px;
+              border-radius: 12px;
+              font-size: 12px;
+              font-weight: 500;
+          }
+          .badge-blue {
+              background-color: #dbeafe;
+              color: #1e40af;
+          }
+          .badge-gray {
+              background-color: #f3f4f6;
+              color: #6b7280;
+          }
+          .tag-default {
+              background-color: #dcfce7;
+              color: #166534;
+              font-size: 12px;
+              padding: 2px 8px;
+              border-radius: 12px;
+              display: inline-block;
+              margin-left: 8px;
+          }
+          .tag-fallback {
+              background-color: #ffedd5;
+              color: #9a3412;
+              font-size: 12px;
+              padding: 2px 8px;
+              border-radius: 12px;
+              display: inline-block;
+              margin-left: 8px;
+          }
+          #loading {
+              text-align: center;
+              padding: 20px;
+              color: #666;
+          }
+          #error {
+              text-align: center;
+              padding: 20px;
+              color: #ef4444;
+              background: #fee2e2;
+              border-radius: 4px;
+          }
+          .copy-button {
+              background: transparent;
+              border: none;
+              cursor: pointer;
+              padding: 4px;
+              margin-left: 6px;
+              border-radius: 4px;
+              transition: background-color 0.2s;
+              vertical-align: middle;
+          }
+          .copy-button:hover {
+              background-color: #e9e9e9;
+          }
+          .copy-button svg {
+              width: 16px;
+              height: 16px;
+              fill: #666;
+          }
+          .tooltip {
+              position: relative;
+              display: inline-block;
+          }
+          .tooltip .tooltiptext {
+              visibility: hidden;
+              width: 60px;
+              background-color: #333;
+              color: #fff;
+              text-align: center;
+              border-radius: 4px;
+              padding: 5px;
+              position: absolute;
+              z-index: 1;
+              bottom: 125%;
+              left: 50%;
+              margin-left: -30px;
+              opacity: 0;
+              transition: opacity 0.3s;
+              font-size: 12px;
+          }
+          .tooltip .tooltiptext.show {
+              visibility: visible;
+              opacity: 1;
+          }
+      </style>
+  </head>
+  <body>
+      <div id="loading">Loading available models...</div>
+      <div id="error" style="display: none;"></div>
+      <table id="models-table" style="display: none;">
+          <thead>
+              <tr>
+                  <th>Model ID</th>
+                  <th>Status</th>
+              </tr>
+          </thead>
+          <tbody id="models-body">
+          </tbody>
+      </table>
+
+      <script>
+          // API endpoint
+          const apiUrl = 'https://api.chunkr.ai/llm/models';
+          
+          async function fetchModels() {
+              const loadingEl = document.getElementById('loading');
+              const errorEl = document.getElementById('error');
+              const tableEl = document.getElementById('models-table');
+              const tableBodyEl = document.getElementById('models-body');
+              
+              try {
+                  const response = await fetch(apiUrl);
+                  if (!response.ok) {
+                      throw new Error(\`API request failed: \${response.status}\`);
+                  }
+                  
+                  const models = await response.json();
+                  
+                  // Hide loading, show table
+                  loadingEl.style.display = 'none';
+                  tableEl.style.display = 'table';
+                  
+                  // Populate table
+                  models.forEach(model => {
+                      const row = document.createElement('tr');
+                      
+                      // Model ID cell
+                      const idCell = document.createElement('td');
+                      const idCode = document.createElement('span');
+                      idCode.className = 'model-id';
+                      idCode.textContent = model.id;
+                      idCell.appendChild(idCode);
+                      
+                      // Copy button with icon
+                      const copyButton = document.createElement('button');
+                      copyButton.className = 'copy-button tooltip';
+                      copyButton.setAttribute('data-model-id', model.id);
+                      copyButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+                      
+                      // Tooltip for copy feedback
+                      const tooltip = document.createElement('span');
+                      tooltip.className = 'tooltiptext';
+                      tooltip.textContent = 'Copied!';
+                      copyButton.appendChild(tooltip);
+                      
+                      // Add event listener to copy button
+                      copyButton.addEventListener('click', function() {
+                          const modelId = this.getAttribute('data-model-id');
+                          const tooltipEl = this.querySelector('.tooltiptext');
+                          
+                          // Copy to clipboard
+                          navigator.clipboard.writeText(modelId).then(function() {
+                              // Show tooltip
+                              tooltipEl.classList.add('show');
+                              
+                              // Hide tooltip after 2 seconds
+                              setTimeout(function() {
+                                  tooltipEl.classList.remove('show');
+                              }, 2000);
+                          }).catch(function() {
+                              tooltipEl.textContent = 'Failed!';
+                              tooltipEl.classList.add('show');
+                              
+                              setTimeout(function() {
+                                  tooltipEl.classList.remove('show');
+                                  tooltipEl.textContent = 'Copied!';
+                              }, 2000);
+                          });
+                      });
+                      
+                      idCell.appendChild(copyButton);
+                      
+                      // Status cell - shows badges for default and fallback status
+                      const statusCell = document.createElement('td');
+                      
+                      // Create badge container 
+                      const badgeContainer = document.createElement('div');
+                      
+                      if (model.default) {
+                          const defaultTag = document.createElement('span');
+                          defaultTag.className = 'tag-default';
+                          defaultTag.textContent = 'System Default';
+                          badgeContainer.appendChild(defaultTag);
+                      }
+                      
+                      if (model.fallback) {
+                          const fallbackTag = document.createElement('span');
+                          fallbackTag.className = 'tag-fallback';
+                          fallbackTag.textContent = 'System Fallback';
+                          badgeContainer.appendChild(fallbackTag);
+                      }
+                      
+                      if (!model.default && !model.fallback) {
+                          const availableTag = document.createElement('span');
+                          availableTag.className = 'badge badge-gray';
+                          availableTag.textContent = 'Available';
+                          badgeContainer.appendChild(availableTag);
+                      }
+                      
+                      statusCell.appendChild(badgeContainer);
+                      
+                      // Add cells to row
+                      row.appendChild(idCell);
+                      row.appendChild(statusCell);
+                      
+                      // Add row to table
+                      tableBodyEl.appendChild(row);
+                  });
+                  
+              } catch (err) {
+                  // Show error
+                  loadingEl.style.display = 'none';
+                  errorEl.style.display = 'block';
+                  errorEl.textContent = \`Error loading models: \${err.message}\`;
+              }
+          }
+          
+          // Fetch models when page loads
+          fetchModels();
+      </script>
+  </body>
+  </html>
+`}
+  style={{
+  width: "100%",
+  height: "600px",
+  border: "1px solid #eaeaea",
+  borderRadius: "8px",
+  overflow: "hidden"
+}}
+/>
+
+> **Note**: This table is dynamically generated by fetching data from our API. Model availability may change over time.
+
+
+# Optical Character Recognition (OCR)
+Source: https://docs.chunkr.ai/docs/features/ocr
+
+Extract text from images
+
+Optical Character Recognition (OCR) is a technology that converts different types of documents,
+such as scanned paper documents, PDF files, or images, into editable and searchable data.
+
+## OCR Strategy
+
+Chunkr AI API always returns OCR results. You can configure the OCR strategy using the `ocr_strategy` parameter.
+
+We have two strategies:
+
+* `All` (Default): Processes all pages with our OCR model.
+* `Auto`: Intelligently applies OCR only to pages with missing or low-quality text. When a text layer is present, the bounding boxes from that layer are used instead of running OCR.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import Configuration, OcrStrategy
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      ocr_strategy=OcrStrategy.AUTO # can also be OcrStrategy.ALL
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "ocr_strategy": "Auto"
+    }'
+  ```
+</CodeGroup>
+
+The `Auto` strategy provides the best balance between accuracy and performance for most use cases.
+Use the `All` strategy when you need to ensure consistent text extraction across all pages or when you suspect the existing text layer might be unreliable.
+
+## OCR + Layout Analysis
+
+OCR and Layout Analysis together are a powerful combination.
+It allows us to get word level bounding boxes and text while also understanding the layout of the document.
+
+You can use that to make experiences like:
+
+* Highlighting exact numbers in a table
+* Highlighting text in images
+* Embedding the text from pictures for semantic search
+
+## Other common use cases
+
+* Digitizing old books and documents
+* Processing invoices and receipts
+* Automating form data entry
+* Reading license plates
+* Converting handwritten notes to digital text
+* Extracting text from screenshots and images
+
+
+# Configuration
+Source: https://docs.chunkr.ai/docs/features/overview
+
+Configure the API to your needs
+
+Different applications have different needs. Chunkr AI API is designed to be flexible and customizable to meet your specific requirements.
+
+We support the following configuration options:
+
+* `chunk_processing`: Controls the setting for the chunking and post-processing of each chunk.
+* `expires_in`: The number of seconds until task is deleted.
+* `high_resolution`: Whether to use high-resolution images for cropping and post-processing.
+* `ocr_strategy`: Controls the Optical Character Recognition (OCR) strategy.
+* `pipeline`: Options for layout analysis and OCR providers.
+* `segment_processing`: Controls the post-processing of each segment type. Allows you to generate HTML, markdown and run custom VLM prompts.
+* `segmentation_strategy`: Controls the segmentation strategy
+
+The configuration options can be combined to create a customized processing pipeline. When a `Task` is created, the configuration is done through the `Configuration` object.
+
+Here is an example of how to configure the API to run a custom VLM prompt on each picture in a document:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration, 
+      GenerationConfig, 
+      GenerationStrategy, 
+      SegmentProcessing, 
+      SegmentationStrategy
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      segment_processing=SegmentProcessing(
+          picture=GenerationConfig(
+              llm="Does this picture have a cat in it? Answer must be true or false."
+          )
+      ),
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_or_url_to_file",
+      "file_name": "document.pdf",
+      "segment_processing": {
+        "picture": {
+          "llm": "Does this picture have a cat in it? Answer must be true or false."
+        }
+      }
+    }'
+  ```
+</CodeGroup>
+
+
+# Pipeline
+Source: https://docs.chunkr.ai/docs/features/pipeline
+
+Choose providers to process your documents
+
+In addition to using chunkr's default models, we also provide a pipeline interface to allow you to use Azure Document Intelligence as a provider.
+When using Azure, instead of the default models, your files are processed through the Azure layout analysis model, the Azure OCR model, and the Azure table OCR model.
+
+You can still leverage Chunkr's intelligent chunking and segment processing. The output will be mapped to the Chunkr output format.
+
+## When to use Azure
+
+* If our queue is full, you can use Azure to process your files
+* If you don't need VLMs on your tables, you can use the Azure table OCR model. This will allow you to get much faster results.
+* Better OCR (we are working on it!)
+
+We improve the outputs from Azure with a combination of last-mile engineering and LLMs.
+In our testing, the hybrid approach (traditional layout analysis + OCR for simple elements and LLMs for complex elements) has the most accurate results.
+
+## Example
+
+1. Use default segment processing and chunking with the Chunkr layout analysis model and OCR model.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration,
+      Pipeline
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      pipeline=Pipeline.CHUNKR
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "pipeline": "Chunkr"
+    }'
+  ```
+</CodeGroup>
+
+2. Use default chunking with the Azure layout analysis model, OCR model and table OCR model.
+   In this case, the HTML and Markdown for the `Table` segment will be generated by the Azure table OCR model.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration,
+      GenerationConfig,
+      GenerationStrategy,
+      SegmentProcessing,
+      Pipeline
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      segment_processing=SegmentProcessing(
+          Table=GenerationConfig(
+              html=GenerationStrategy.AUTO,
+              markdown=GenerationStrategy.AUTO
+          ),
+      ),
+      pipeline=Pipeline.AZURE,
+  ))
+  ```
+
+  ```bash cURL
+  curl --request POST \
+    --url https://api.chunkr.ai/api/v1/task/parse \
+    --header 'Authorization: YOUR_API_KEY' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "file": "base64_encoded_file_content",
+      "file_name": "document.pdf",
+      "segment_processing": {
+        "Table": {
+          "html": "Auto",
+          "markdown": "Auto"
+        }
+      },
+      "pipeline": "Azure"
+    }'
+  ```
+</CodeGroup>
+
+
+# Segment Processing
+Source: https://docs.chunkr.ai/docs/features/segment-processing
+
+Post-processing of segments
+
+Chunkr processes files by converting them into chunks, where each chunk contains a list of segments. This basic unit allows our API to be very flexible. See more information in the [Layout Analysis](./layout-analysis/segmentation_strategy.mdx) section.
+
+After the segments are identified you can easily configure many post-processing capabilities. You can use our defaults or configure how each segment type is processed.
+
+#### Processing Methods
+
+* **Vision Language Models (VLM)**: Leverage AI models to generate HTML/Markdown content and run custom prompts
+* **Heuristic-based Processing**: Apply rule-based algorithms for consistent HTML/Markdown generation
+
+#### Additional Features
+
+* **Cropping**: Get back the cropped images
+* **Content to embed**: Configure the content that will be used for chunking and embeddings
+
+Our default processing works for most documents, and RAG use cases.
+
+> **Note**: Chunkr currently does not support creating embeddings, the embed\_sources field will populate the `embed` field for the `chunk`.
+
+## Understanding the configuration
+
+When you configure the `SegmentProcessing` settings, you are configuring how each segment type is processed.
+This means that anytime a segment type is identified, the configuration will be applied.
+
+These are all the fields that are available for configuration:
+
+```python
+GenerationConfig(
+    html=GenerationStrategy.AUTO,
+    markdown=GenerationStrategy.AUTO,
+    crop_image=CroppingStrategy.AUTO,
+    llm=None,
+    embed_sources=[EmbedSource.MARKDOWN],
+    extended_context=False,
+)
+```
+
+### Defaults
+
+By default, Chunkr applies the following processing strategies for each segment type.
+You can override these defaults by specifying custom configuration in your `SegmentProcessing` settings.
+HTML, Markdown, and content are always returned. Extended context is off by default for all outputs (HTML, Markdown, LLM), and there are no `html_page_extended` or `md_page_extended` fields.
+
+<CodeGroup>
+  ```python Page, Tables and Formulas
+  # Page, Table and Formula by default are processed using LLM.
+  # Formulas are returned as LaTeX.
+
+  default_llm_config = GenerationConfig(
+      html=GenerationStrategy.LLM,
+      markdown=GenerationStrategy.LLM,
+      crop_image=CroppingStrategy.AUTO,
+      llm=None,
+      embed_sources=[EmbedSource.MARKDOWN],
+      extended_context=False
+  )
+
+  default_config = Configuration(
+      segment_processing=SegmentProcessing(
+          Table=default_llm_config,
+          Formula=default_llm_config,
+      )
+  )
+  ```
+
+  ```python Pictures
+  # Pictures by default are processed using LLM and are cropped by default.
+
+  default_picture_config = GenerationConfig(
+      html=GenerationStrategy.LLM,
+      markdown=GenerationStrategy.LLM,
+      crop_image=CroppingStrategy.ALL,
+      llm=None,
+      embed_sources=[EmbedSource.MARKDOWN],
+      extended_context=False
+  )
+
+  default_config = Configuration(
+      segment_processing=SegmentProcessing(
+          Picture=default_picture_config
+      )
+  )
+  ```
+
+  ```python Other Elements
+  # All other element's HTML and Markdown are processed using heuristics.
+
+  default_text_config = GenerationConfig(
+      html=GenerationStrategy.AUTO,
+      markdown=GenerationStrategy.AUTO,
+      crop_image=CroppingStrategy.AUTO,
+      llm=None,
+      embed_sources=[EmbedSource.MARKDOWN]
+  )
+
+  default_config = Configuration(
+      segment_processing=SegmentProcessing(
+          Title=default_text_config,
+          SectionHeader=default_text_config,
+          Text=default_text_config,
+          ListItem=default_text_config,
+          Caption=default_text_config,
+          Footnote=default_text_config,
+          PageHeader=default_text_config,
+          PageFooter=default_text_config,
+      )
+  )
+  ```
+</CodeGroup>
+
+### GenerationStrategy
+
+The `GenerationStrategy` enum determines how Chunkr processes and generates output for a segment. It has two options:
+
+* `GenerationStrategy.LLM`: Uses a Vision Language Model (VLM) to analyze and generate descriptions of the segment content. This is particularly useful for complex segments like tables, charts, and images where you want AI-powered understanding.
+
+* `GenerationStrategy.AUTO`: Uses rule-based heuristics to process the segment. This is faster and works well for straightforward content like plain text, headers, and lists.
+
+You can configure this strategy separately for HTML and Markdown output formats using the `html` and `markdown` fields in the configuration.
+
+This is how you can access the `html` and `markdown` field in the segment object:
+
+```python
+for chunk in task.output.chunks:
+    for segment in chunk.segments:
+        print(segment.html)
+        print(segment.markdown)
+```
+
+### CroppingStrategy
+
+The `CroppingStrategy` enum controls how Chunkr handles image cropping for segments. It offers two options:
+
+* `CroppingStrategy.ALL`: Forces cropping for every segment, extracting just the content within its bounding box.
+
+* `CroppingStrategy.AUTO`: Lets Chunkr decide when cropping is necessary based on the segment type and post-processing requirements.
+  For example, if an LLM is required to generate HTML from tables then they will be cropped.
+
+```python
+for chunk in task.output.chunks:
+    for segment in chunk.segments:
+        print(segment.image)
+```
+
+> **Note**: By default the `image` field contains a presigned URL to the cropped image that is valid for 10 minutes.
+> You can also retrieve the image data as a base64 encoded string by following our [best practices guide](/sdk/data-operations/get#best-practices).
+
+### LLM Prompt
+
+The `llm` field is used to pass a prompt to the LLM. This prompt is independent of the `GenerationStrategy` and will be applied to all segment types that have the `llm` field set.
+
+If you need extended context for LLM processing, you must explicitly enable it by setting `extended_context=True` in your `GenerationConfig`. Extended context requires a page image to be available at runtime.
+
+Extended context is particularly useful for:
+
+* Tables where legends aren't properly segmented
+* Images that need surrounding page context for interpretation
+* Charts or diagrams that reference information elsewhere on the page
+* When segments need to "understand" their position in relation to other content
+
+> **Note**: The `llm` prompts can sometimes mess with the LLMs and cause refusals. If your tasks are failing, try changing the `llm` prompt.
+
+### Embed Sources
+
+The `embed_sources` field is used to specify the sources of content that will be used for embeddings.
+This is useful if you want to use a different source of content for embeddings than the default HTML or Markdown.
+They will also be used to calculate the chunk length during chunking. See more information in the [chunking](./chunking#calculating-chunk-lengths-with-embed-sources) section.
+
+The embed sources is an array of sources. The index of the source will be used to determine which source appears first in the `embed` field.
+
+For example, if you have `[EmbedSource.MARKDOWN, EmbedSource.HTML]`, the Markdown content will appear first in the `embed` field.
+By default, the `embed` field will only contain the Markdown content.
+
+```python Python
+for chunk in task.output.chunks:
+    print(chunk.embed)
+```
+
+> **Note**: This is the only configuration option that affects the `chunk` object rather than the `segment` object.
+>
+> When you set the `embed_sources` field:
+>
+> * You determine what content from segments will be included in the `embed` field of chunks
+> * The order of sources in the array controls which content appears first in the `embed` field
+> * This does not change the order of segments within chunks - reading order is always preserved
+>
+> For example, if you set `embed_sources=[EmbedSource.LLM, EmbedSource.MARKDOWN]` for Tables, the LLM-generated content will appear before the markdown content in the `embed` field of any chunk containing a Table segment.
+
+### Extended Context
+
+The `extended_context` flag controls whether Chunkr provides the full page context when processing a segment. When set to `True`, Chunkr will use the entire page image as context when processing the segment with an LLM.
+
+Extended context is OFF by default for all segment types and output formats (HTML, Markdown, LLM). To leverage extended context, you must explicitly set `extended_context=True` within the `GenerationConfig` for the desired segment type(s).
+
+Extended context is particularly beneficial for:
+
+* **Tables/Charts with External Legends**: When a legend or explanatory text is located elsewhere on the page but is crucial for interpreting the table/chart.
+* **Images Requiring Surrounding Context**: For images where understanding the surrounding text or other visual elements is necessary for accurate description or analysis.
+* **Formulas/Diagrams**: When the meaning depends on adjacent text or figures.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai.models import Configuration, GenerationConfig, GenerationStrategy, SegmentProcessing
+
+  config = Configuration(
+      segment_processing=SegmentProcessing(
+          Table=GenerationConfig(
+              html=GenerationStrategy.LLM,
+              markdown=GenerationStrategy.LLM,
+              extended_context=True,  # Enable extended context
+          ),
+          Picture=GenerationConfig(
+              html=GenerationStrategy.LLM,
+              markdown=GenerationStrategy.LLM,
+              extended_context=True,  # Enable extended context
+          )
+          # ... other segment configs
+      )
+  )
+  ```
+
+  ```bash cURL
+  curl -X POST https://api.chunkr.ai/api/v1/task \
+    --header "Authorization: YOUR_API_KEY" \
+    --header "Content-Type: application/json" \
+    --data '{
+      "file": "base64_or_url_to_file",
+      "segment_processing": {
+        "Table": {
+          "html": "LLM",
+          "markdown": "LLM",
+          "extended_context": true
+        },
+        "Picture": {
+          "html": "LLM",
+          "markdown": "LLM",
+          "extended_context": true
+        }
+      }
+    }'
+  ```
+</CodeGroup>
+
+## Example
+
+Here is a quick example of how to use Chunkr to process a document with different segment processing configurations.
+This configuration will:
+
+* Summarize the key trends of all `Table` segments and populate the `llm` field with the LLM content in the segment
+* Enable extended context for Tables and Pictures to capture visual context from the full page
+* The `embed` field for chunks that container a `Table` segment will contain both the LLM content and the markdown for the table,
+  with the LLM content appearing first.
+* Crop all `SectionHeader` segments to the bounding box.
+* All other segments will use their default processing.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration,
+      CroppingStrategy,
+      EmbedSource,
+      GenerationConfig,
+      GenerationStrategy,
+      SegmentProcessing
+  )
+
+  chunkr = Chunkr()
+
+  chunkr.upload("path/to/file", Configuration(
+      segment_processing=SegmentProcessing(
+          Table=GenerationConfig(
+              llm="Summarize the key trends in this table including any context from legends or surrounding text",
+              embed_sources=[EmbedSource.LLM, EmbedSource.MARKDOWN],
+              extended_context=True
+          ),
+          Picture=GenerationConfig(
+              html=GenerationStrategy.LLM,
+              markdown=GenerationStrategy.LLM,
+              crop_image=CroppingStrategy.ALL,
+              extended_context=True,
+          ),
+          SectionHeader=GenerationConfig(
+              crop_image=CroppingStrategy.ALL
+          ),
+      ),
+  ))
+  ```
+
+  ```bash cURL
+  curl -X POST https://api.chunkr.ai/api/v1/task \
+    --header "Authorization: YOUR_API_KEY" \
+    --header "Content-Type: application/json" \
+    --data '{
+      "file": "base64_or_url_to_file",
+      "segment_processing": {
+        "Table": {
+          "llm": "Summarize the key trends in this table including any context from legends or surrounding text",
+          "extended_context": true
+        },
+        "Picture": {
+          "html": "LLM",
+          "markdown": "LLM",
+          "crop_image": "All",
+          "extended_context": true,
+        },
+        "SectionHeader": {
+          "crop_image": "All"
+        },
+        "Text": {
+          "html": "Auto",
+          "markdown": "LLM"
+        }
+      }
+    }'
+  ```
+</CodeGroup>
+
+
+# Changelog
+Source: https://docs.chunkr.ai/docs/get-started/changelog
+
+
+
+Please refer to our [GitHub Changelog](https://github.com/lumina-ai-inc/chunkr/blob/main/CHANGELOG.md) for the latest updates.
+
+
+# LLM Documentation
+Source: https://docs.chunkr.ai/docs/get-started/llm
+
+LLM-ready documentation for Chunkr AI
+
+## Available Formats
+
+We offer two primary formats for LLMs:
+
+* **Condensed Documentation**: [https://docs.chunkr.ai/llms.txt](https://docs.chunkr.ai/llms.txt)
+  Streamlined version optimized for quick reference by LLMs. These are also helpful for MCP servers.
+
+* **Full Documentation**: [https://docs.chunkr.ai/llms-full.txt](https://docs.chunkr.ai/llms-full.txt)
+  Complete documentation with all details and examples. Can be dumped directly into context.
+
+## How to Use
+
+[Here](https://youtu.be/fk2WEVZfheI) is a helpful video on how to intergrate llm.txt and MCP servers.
+
+
+# Chunkr AI
+Source: https://docs.chunkr.ai/docs/get-started/overview
+
+Open Source Document Intelligence
+
+<img style={{ borderRadius: "10px" }} src="https://mintlify.s3.us-west-1.amazonaws.com/lumina-53fcea44/assets/hero.webp" alt="Chunkr AI" noZoom />
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="book" iconType="solid" href="/docs/get-started/quickstart">
+    Learn how to get started with Chunkr AI API
+  </Card>
+
+  <Card title="Use Cases" icon="lightbulb" iconType="solid" href="/docs/use-cases/bulk-upload">
+    Explore examples and strategies
+  </Card>
+
+  <Card title="SDKs" icon="code" iconType="solid" href="../../sdk/installation">
+    Access our client libraries
+  </Card>
+
+  <Card title="API Reference" icon="code-branch" iconType="solid" href="/api-references/task/create-task">
+    Dive into our API reference
+  </Card>
+</CardGroup>
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Layout analysis" href="/docs/features/layout-analysis/what" horizontal={true}>
+    Preserve document structure with advanced layout detection
+  </Card>
+
+  <Card title="Segment processing" href="/docs/features/segment-processing" horizontal={true}>
+    Leverage Vision Language Models for enhanced document understanding
+  </Card>
+
+  <Card title="OCR" href="/docs/features/ocr" horizontal={true}>
+    Extract text from images and scanned documents with high accuracy
+  </Card>
+
+  <Card title="Intelligent chunking" href="/docs/features/chunking" horizontal={true}>
+    Split documents into meaningful sections using layout-aware algorithms
+  </Card>
+
+  <Card title="Pipelines" href="/docs/features/pipeline" horizontal={true}>
+    Options for layout analysis and OCR providers
+  </Card>
+
+  <Card title="Multiple content types" href="../../sdk/data-operations/create#supported-file-types" horizontal={true}>
+    Process PDFs, Office files (Word, Excel, PowerPoint), and images through a single API
+  </Card>
+</CardGroup>
+
+
+# Developer Quickstart
+Source: https://docs.chunkr.ai/docs/get-started/quickstart
+
+Learn how to get started with Chunkr AI API
+
+Chunkr AI is an API service to convert complex documents into LLM/RAG-ready data. We support a wide range of document types, including PDFs, Office files (Word, Excel, PowerPoint), and images.
+
+## Getting Started
+
+To get started with Chunkr AI, follow these simple steps to set up your account and integrate our API into your application.
+
+### Step 1: Sign Up and Create an API Key
+
+1. Visit [Chunkr AI](https://chunkr.ai)
+2. Click on "Login" and create your account
+3. Once logged in, navigate to "API Keys" in the dashboard
+
+### Step 2: Install our client SDK
+
+<CodeGroup>
+  ```bash Python
+  pip install chunkr-ai
+  ```
+</CodeGroup>
+
+### Step 3: Upload your document
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Initialize the Chunkr client with your API key - get this from https://chunkr.ai
+  chunkr = Chunkr(api_key="your_api_key")
+
+  # Upload a document via url or local file path
+  url = "https://chunkr-web.s3.us-east-1.amazonaws.com/landing_page/input/specs.pdf"
+  task = chunkr.upload(url) 
+  ```
+</CodeGroup>
+
+### Step 4: Export the results
+
+Chunkr AI will return a `TaskResponse` object. This object contains the results of the document conversion. You can export the results in various formats or load them into a variable.
+
+<CodeGroup>
+  ```python Python
+  # Export HTML of document
+  html = task.html(output_file="output.html")
+
+  # Export markdown of document
+  markdown = task.markdown(output_file="output.md")
+
+  # Export text of document
+  content = task.content(output_file="output.txt")
+
+  # Export result as JSON - TaskResponse is already in memory so no need to load it into a variable
+  task.json(output_file="output.json")
+  ```
+</CodeGroup>
+
+### Step 5: Explore the output
+
+The output of the task can be used to build your RAG pipeline.
+Checkout the [API Reference](/api-references/task/create-task#response-output-chunks) for more details.
+
+<CodeGroup>
+  ```python Python
+  # The output of the task is a list of chunks
+  chunks = task.output.chunks
+
+  # Each chunk is a list of segments
+  for chunk in chunks:
+      for segment in chunk.segments:
+          print(segment.segment_type)
+
+  # You can also access the `embed` field in the chunk 
+  # for content to be used in RAG pipelines
+  for chunk in chunks:
+      print(chunk.embed)
+  ```
+</CodeGroup>
+
+### Step 6: Clean up
+
+You can clean up the open connections by calling the `close()` method on the `Chunkr` client.
+
+<CodeGroup>
+  ```python Python
+  chunkr.close()
+  ```
+</CodeGroup>
+
+### Step 7: API References and support for other languages
+
+To understand all the input configurations and output schema and models, please refer to the [API References](/api-references/task/create-task).
+You can also use the API Reference Playground to generate cURL requests and code snippets for different languages like JavaScript/TypeScript to help you get started quickly.
+
+## Authentication Options
+
+You can authenticate with the Chunkr AI API in two ways:
+
+1. **Direct API Key** - Pass your API key directly when initializing the client
+2. **Environment Variable** - Set `CHUNKR_API_KEY` in your `.env` file
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Option 1: Initialize with API key directly
+  chunkr = Chunkr(api_key="your_api_key")
+
+  # Option 2: Initialize without api_key parameter - will use CHUNKR_API_KEY from environment
+  chunkr = Chunkr()
+  ```
+</CodeGroup>
+
+## Self Hosted
+
+If you're using a self-hosted deployment of Chunkr AI, you can configure the API URL when initializing the client:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Option 1: With direct API key
+  chunkr = Chunkr(
+      api_key="your_api_key",
+      url="https://your-self-hosted-chunkr.ai"
+  )
+
+  # Option 2: Using environment variables
+  # Set CHUNKR_API_KEY and CHUNKR_URL in your .env file
+  chunkr = Chunkr()
+  ```
+</CodeGroup>
+
+When using environment variables for self-hosted deployments, set both `CHUNKR_API_KEY` and `CHUNKR_URL` in your `.env` file.
+
+
+# Docker compose
+Source: https://docs.chunkr.ai/docs/self-hosting/docker-compose
+
+
+
+Please refer to our [GitHub README](https://github.com/lumina-ai-inc/chunkr?tab=readme-ov-file#quick-start-with-docker-compose) for instructions on how to get started with Chunkr AI using Docker Compose.
+
+
+# Kubernetes
+Source: https://docs.chunkr.ai/docs/self-hosting/kubernetes
+
+
+
+Please refer to our [GitHub README](https://github.com/lumina-ai-inc/chunkr?tab=readme-ov-file#quick-start-with-kubernetes) for instructions on how to get started with Chunkr AI using Kubernetes.
+
+
+# Bulk Upload
+Source: https://docs.chunkr.ai/docs/use-cases/bulk-upload
+
+Learn how to efficiently process multiple files with Chunkr AI
+
+Here's how to efficiently process multiple files using Chunkr AI's async capabilities.
+
+## Process a Directory
+
+Here's a simple script to process all files in a directory:
+
+<CodeGroup>
+  ```python Python
+  import asyncio
+  from chunkr_ai import Chunkr
+  import os
+  from pathlib import Path
+
+  chunkr = Chunkr()
+
+  async def process_directory(input_dir: str, output_dir: str):
+      try:
+          # Create output directory if it doesn't exist
+          os.makedirs(output_dir, exist_ok=True)
+          
+          # Get all files in directory
+          files = list(Path(input_dir).glob('*.*'))
+          print(f"Found {len(files)} files to process")
+          
+          # Process files concurrently
+          tasks = []
+          for file_path in files:
+              task = asyncio.create_task(process_file(chunkr, file_path, output_dir))
+              tasks.append(task)
+          
+          # Wait for all files to complete
+          results = await asyncio.gather(*tasks)
+          
+          print(f"Completed processing {len(results)} files")
+      except Exception as e:
+          print(f"Error processing directory: {e}")
+
+  async def process_file(chunkr, file_path, output_dir):
+      try:
+          # Upload file
+          result = await chunkr.upload(file_path)
+          
+          # Check if upload was successful
+          if result.status == "Failed":
+              print(f"Failed to process file {file_path}: {result.message}")
+              return None
+          
+          # Save result
+          file_name = file_path.name
+          output_file_path = Path(output_dir) / f"{file_name}.json"
+          result.json(output_file_path)
+          
+          return file_name
+      except Exception as e:
+          print(f"Error processing file {file_path}: {e}")
+          return None
+
+
+  # Run the processor
+  if __name__ == "__main__":
+      INPUT_DIR = "/data/Chunkr/dataset/files"
+      OUTPUT_DIR = "processed/"
+      asyncio.run(process_directory(INPUT_DIR, OUTPUT_DIR))
+  ```
+</CodeGroup>
+
+
+# Usage Patterns
+Source: https://docs.chunkr.ai/docs/use-cases/usage-patterns
+
+Optimize Chunkr configuration for your use case
+
+Chunkr AI is designed to be configurable, so there probably exists a configuration that will work for your use case.
+Here are some examples to get you started.
+
+## Complex Documents with Extended Context
+
+For documents with complex layouts where elements need surrounding context (such as tables with separate legends, charts with explanatory text, or images that need page context), enable extended context processing:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  from chunkr_ai.models import (
+      Configuration,
+      GenerationConfig,
+      GenerationStrategy,
+      SegmentProcessing
+  )
+
+  chunkr = Chunkr()
+
+  config = Configuration(
+      high_resolution=True,
+      segment_processing=SegmentProcessing(
+          Table=GenerationConfig(
+              html=GenerationStrategy.LLM,
+              markdown=GenerationStrategy.LLM,
+              extended_context=True
+          ),
+          Picture=GenerationConfig(
+              html=GenerationStrategy.LLM,
+              markdown=GenerationStrategy.LLM,
+              extended_context=True
+          ),
+          Formula=GenerationConfig(
+              html=GenerationStrategy.LLM,
+              markdown=GenerationStrategy.LLM,
+              extended_context=True
+          )
+      )
+  )
+
+  chunkr.upload("path/to/file", config)
+
+  ```
+
+  ```bash cURL
+  curl -X POST https://api.chunkr.ai/api/v1/task \
+    -H "Authorization: YOUR_API_KEY" \
+    -F file=@path/to/file \
+    -F 'high_resolution=true;type=application/json' \
+    -F 'segment_processing={
+        "Table": {
+          "html": "LLM",
+          "markdown": "LLM",
+          "extended_context": true,
+        },
+        "Picture": {
+          "html": "LLM",
+          "markdown": "LLM",
+          "extended_context": true,
+        },
+        "Formula": {
+          "html": "LLM",
+          "markdown": "LLM",
+          "extended_context": true,
+        }
+      };type=application/json'
+  ```
+</CodeGroup>
+
+## Pre-signed URLs and Base64 Alternatives
+
+When retrieving tasks, Chunkr generates pre-signed URLs for accessing:
+
+* Images
+* Input File
+* PDF File
+
+These URLs expire after 10 minutes.
+For longer persistence or storage, you can request base64-encoded URLs instead:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  chunkr = Chunkr()
+
+  # Get task with base64-encoded URLs instead of pre-signed URLs
+  task = chunkr.get_task("task_123", base64_urls=True)
+  ```
+
+  ```bash cURL
+  curl -X GET "https://api.chunkr.ai/api/v1/task/{task_id}?base64_urls=true" \
+    -H "Authorization: YOUR_API_KEY"
+  ```
+</CodeGroup>
+
+
+# Configuration
+Source: https://docs.chunkr.ai/sdk/configuration
+
+Learn how to configure tasks in Chunkr AI
+
+Chunkr AI allows you to configure tasks with a `Configuration` object. All configurations can be used together.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai.models import ChunkProcessing, Configuration, OcrStrategy
+
+  config = Configuration(
+      chunk_processing=ChunkProcessing(target_length=1024),
+      expires_in=3600,
+      high_resolution=True,
+      ocr_strategy=OcrStrategy.AUTO,
+  )
+
+  task = chunkr.upload("path/to/your/file", config)
+  ```
+</CodeGroup>
+
+## Available Configuration Examples
+
+### Chunk Processing
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai.models import ChunkProcessing
+  config = Configuration(
+      chunk_processing=ChunkProcessing(
+      ignore_headers_and_footers=True,
+      target_length=1024
+  )
+  )
+  ```
+</CodeGroup>
+
+### Expires In
+
+<CodeGroup>
+  ```python Python
+  config = Configuration(expires_in=3600)
+  ```
+</CodeGroup>
+
+### High Resolution
+
+<CodeGroup>
+  ```python Python
+  config = Configuration(high_resolution=True)
+  ```
+</CodeGroup>
+
+### OCR Strategy
+
+<CodeGroup>
+  ```python Python
+  config = Configuration(ocr_strategy=OcrStrategy.AUTO) # or OcrStrategy.ALL
+  ```
+</CodeGroup>
+
+### Segment Processing
+
+This example show cases all the options for segment processing. This is what the default configuration looks like, and is applied if nothing is specified.
+For your own configuration, you can customize the options you want to change and the rest will be applied by default.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai.models import (
+      Configuration, 
+      CroppingStrategy, 
+      GenerationConfig, 
+      GenerationStrategy, 
+      SegmentProcessing
+    )
+    
+    config = Configuration(
+        segment_processing=SegmentProcessing(
+            Caption=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            Formula=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.LLM,
+                markdown=GenerationStrategy.LLM,
+                llm=None
+            ),
+            Footnote=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            ListItem=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            Page=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            PageFooter=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            PageHeader=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            Picture=GenerationConfig(
+                crop_image=CroppingStrategy.ALL, 
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            SectionHeader=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            Table=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.LLM,
+                markdown=GenerationStrategy.LLM,
+                llm=None
+            ),
+            Text=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            ),
+            Title=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.AUTO,
+                markdown=GenerationStrategy.AUTO,
+                llm=None
+            )
+        )
+    )
+  ```
+</CodeGroup>
+
+You can customize any segment's generation strategy and add optional LLM prompts:
+
+<CodeGroup>
+  ```python Python
+  # Example with custom LLM prompt for tables
+    config = Configuration(
+        segment_processing=SegmentProcessing(
+            Table=GenerationConfig(
+                crop_image=CroppingStrategy.AUTO,
+                html=GenerationStrategy.LLM,
+                markdown=GenerationStrategy.LLM,
+                llm="Convert this table to a clear and concise format"
+            )
+        )
+    )
+  ```
+</CodeGroup>
+
+### Segmentation Strategy
+
+<CodeGroup>
+  ```python Python
+  config = Configuration(
+      segmentation_strategy=SegmentationStrategy.LAYOUT_ANALYSIS # or SegmentationStrategy.PAGE
+  )
+  ```
+</CodeGroup>
+
+
+# Canceling Tasks
+Source: https://docs.chunkr.ai/sdk/data-operations/cancel
+
+Learn how to cancel queued tasks in Chunkr AI
+
+Chunkr AI allows you to cancel tasks that are in queede but haven't started processing. Any task that has status `Starting` can be canceled.
+You can cancel tasks either by their ID or using a task object.
+
+## Canceling by Task ID
+
+Use the `cancel_task()` method when you have the task ID:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  chunkr = Chunkr()
+
+  # Cancel task by ID
+  chunkr.cancel_task("task_123")
+  ```
+</CodeGroup>
+
+## Canceling from TaskResponse Object
+
+If you have a task object, you can cancel it directly using the `cancel()` method. This method will also return the updated task status:
+
+<CodeGroup>
+  ```python Python
+  # Get existing task
+  task = chunkr.get_task("task_123")
+
+  # Cancel the task and get updated status
+  updated_task = task.cancel()
+  print(updated_task.status) # Will show canceled status
+  ```
+</CodeGroup>
+
+## Async Usage
+
+For async applications, use `await`:
+
+<CodeGroup>
+  ```python Python
+  # Cancel by ID
+  await chunkr.cancel_task("task_123")
+
+  # Or cancel from task object
+  task = await chunkr.get_task("task_123")
+  updated_task = await task.cancel()
+  ```
+</CodeGroup>
+
+
+# Creating Tasks
+Source: https://docs.chunkr.ai/sdk/data-operations/create
+
+Learn how to upload files and create processing tasks with Chunkr AI
+
+The Chunkr AI SDK provides two main methods for uploading files:
+
+* `upload()`: Upload and wait for complete processing
+* `create_task()`: Upload and get an immediate task response
+
+## Complete Processing with `upload()`
+
+The `upload()` method handles the entire process - it uploads your file and waits for processing to complete:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  chunkr = Chunkr()
+
+  # Upload and wait for complete processing
+  task = chunkr.upload("path/to/your/file")
+
+  # All processing is done - you can access results immediately
+  print(task.task_id)
+  print(task.status) # Will be "completed"
+  print(task.output) # Contains processed results
+  ```
+</CodeGroup>
+
+## Instant Response with `create_task()`
+
+If you want to start processing but don't want to wait for completion, use `create_task()`:
+
+<CodeGroup>
+  ```python Python
+  # Create task without waiting
+  task = chunkr.create_task("path/to/your/file")
+
+  # Task is created but processing may not be complete
+  print(task.task_id)
+  print(task.status)  # Might be "Starting"
+  print(task.output)  # Might be None if processing isn't finished
+  ```
+</CodeGroup>
+
+## Checking Task Status with `poll()`
+
+When using `create_task()`, you can check the status later using `poll()`:
+
+<CodeGroup>
+  ```python Python
+  # Create task immediately
+  task = chunkr.create_task("path/to/your/file")
+
+  # ... do other work ...
+
+  # Check status when needed
+  result = task.poll()
+  print(result.status)
+  print(result.output)  # Now contains processed results if status is "Succeeded"
+  ```
+</CodeGroup>
+
+For async applications, remember to use `await`:
+
+<CodeGroup>
+  ```python Python
+  # Create task immediately
+  task = await chunkr.create_task("path/to/your/file")
+
+  # ... do other work ...
+
+  # Check status when needed
+  result = await task.poll()
+  ```
+</CodeGroup>
+
+## Supported File Types
+
+We support PDFs, Office files (Word, Excel, PowerPoint), and images. You can upload them in several ways:
+
+<CodeGroup>
+  ```python Python
+  # From a file path
+  task = chunkr.upload("path/to/your/file")
+
+  # From an opened file
+  with open("path/to/your/file", "rb") as f:
+      task = chunkr.upload(f)
+
+  # From a URL
+  task = chunkr.upload("https://example.com/document.pdf")
+
+  # From a base64 string
+  task = chunkr.upload("JVBERi0...")
+
+  # From a PIL Image
+  from PIL import Image
+  img = Image.open("path/to/your/photo.jpg")
+  task = chunkr.upload(img)
+  ```
+</CodeGroup>
+
+
+# Deleting Tasks
+Source: https://docs.chunkr.ai/sdk/data-operations/delete
+
+Learn how to delete tasks in Chunkr AI
+
+Chunkr AI provides methods to delete tasks when they're no longer needed. Any task that has status `Succeeded` or `Failed` can be deleted.
+You can delete tasks either by their ID or using a task object.
+
+## Deleting by Task ID
+
+Use the `delete_task()` method when you have the task ID:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  chunkr = Chunkr()
+
+  # Delete task by ID
+  chunkr.delete_task("task_123")
+  ```
+</CodeGroup>
+
+## Deleting from TaskResponse Object
+
+If you have a task object, you can delete it directly using the `delete()` method:
+
+<CodeGroup>
+  ```python Python
+  # Get existing task
+  task = chunkr.get_task("task_123")
+
+  # Delete the task
+  task.delete()
+  ```
+</CodeGroup>
+
+## Async Usage
+
+For async applications, remember to use `await`:
+
+<CodeGroup>
+  ```python Python
+  # Delete by ID
+  await chunkr.delete_task("task_123")
+
+  # Or delete from task object
+  task = await chunkr.get_task("task_123")
+  await task.delete()
+  ```
+</CodeGroup>
+
+
+# Getting Tasks
+Source: https://docs.chunkr.ai/sdk/data-operations/get
+
+Learn how to retrieve and read task information from Chunkr AI
+
+You can retrieve information about a task at any time using the `get_task()` method
+This is useful for checking the status of previously created tasks or accessing their results.
+
+## Basic Usage
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  chunkr = Chunkr()
+
+  # Get task by ID
+  task = chunkr.get_task("task_123")
+
+  # Access task information
+  print(task.status)
+  print(task.output)
+  ```
+</CodeGroup>
+
+## Customizing the Response
+
+The `get_task()` method accepts two optional parameters to customize the response:
+
+<CodeGroup>
+  ```python Python
+  # Exclude chunks from output
+  task = chunkr.get_task("task_123", include_chunks=False) 
+
+  # Get task with base64-encoded URLs instead of presigned URLs
+  task = chunkr.get_task("task_123", base64_urls=True)
+  ```
+</CodeGroup>
+
+## Response Options
+
+| Parameter        | Default | Description                                                                                                                  |
+| ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `include_chunks` | `True`  | When `True`, includes all processed chunks in the response. Set to `False` to receive a lighter response without chunk data. |
+| `base64_urls`    | `False` | When `True`, returns URLs as base64-encoded strings. When `False`, returns presigned URLs for direct access.                 |
+
+## Async Usage
+
+For async applications, remember to use `await`:
+
+<CodeGroup>
+  ```python Python
+  # Get task asynchronously
+  task = await chunkr.get_task("task_123")
+  ```
+</CodeGroup>
+
+## Best Practices
+
+* Store task IDs when creating tasks if you need to retrieve them later
+* Use `include_chunks=False` when you only need task metadata
+* Consider using base64 URLs (`base64_urls=True`) when you need to cache or store the URLs locally
+
+<CodeGroup>
+  ```python Python
+  # Get task with base64-encoded URLs
+  task = chunkr.get_task("task_123", base64_urls=True)
+
+  # Get task without chunks
+  task = chunkr.get_task("task_123", include_chunks=False)
+  ```
+
+  ```bash cURL
+  # Get task with base64-encoded URLs
+  curl -X GET "https://api.chunkr.ai/api/v1/task/{task_id}?base64_urls=true" -H "Authorization: YOUR_API_KEY"
+
+  # Get task without chunks
+  curl -X GET "https://api.chunkr.ai/api/v1/task/{task_id}?include_chunks=false" -H "Authorization: YOUR_API_KEY"
+  ```
+</CodeGroup>
+
+
+# Updating Tasks
+Source: https://docs.chunkr.ai/sdk/data-operations/update
+
+Learn how to update existing tasks in Chunkr AI
+
+Chunkr AI allows you to update the configuration of existing tasks. You can update a task either by its ID or using a task object.
+
+## Updating by Task ID
+
+Use the `update()` method with a task ID when you have the ID stored:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr, Configuration
+  chunkr = Chunkr()
+
+  # Update task with new configuration
+  new_config = Configuration(
+      # your configuration options here
+  )
+
+  # Update and wait for processing
+  task = chunkr.update("task_123", new_config)
+  ```
+</CodeGroup>
+
+## Updating from TaskResponse Object
+
+If you have a task object (from a previous `get_task()` or `create_task()`), you can update it directly:
+
+<CodeGroup>
+  ```python Python
+  # Get existing task
+  task = chunkr.get_task("task_123")
+
+  # Update configuration
+  new_config = Configuration(
+      # your configuration options here
+  )
+
+  # Update and wait
+  task = task.update(new_config)
+  ```
+</CodeGroup>
+
+## Immediate vs. Waited Updates
+
+Like task creation, you have two options for updates:
+
+### Wait for Processing
+
+The standard `update()` method waits for processing to complete:
+
+<CodeGroup>
+  ```python Python
+  # Updates and waits for completion
+  task = chunkr.update("task_123", new_config)
+  print(task.status) # Will be "Succeeded"
+  ```
+</CodeGroup>
+
+### Immediate Response
+
+Use `update_task()` for an immediate response without waiting:
+
+<CodeGroup>
+  ```python Python
+  # Updates and returns immediately
+  task = chunkr.update_task("task_123", new_config)
+  print(task.status) # Might be "Starting"
+
+  # Get status later
+  result = task.poll()
+  ```
+</CodeGroup>
+
+## Async Usage
+
+For async applications, use `await` with the update methods:
+
+<CodeGroup>
+  ```python Python
+  # Update and wait
+  task = await chunkr.update("task_123", new_config)
+
+  # Update without waiting
+  task = await chunkr.update_task("task_123", new_config)
+  result = await task.poll() # Check status later
+  ```
+</CodeGroup>
+
+
+# Export to different formats
+Source: https://docs.chunkr.ai/sdk/export
+
+
+
+Chunkr AI allows you to export task results in multiple formats. You can get the content directly and save it to a file.
+
+## Available Export Formats
+
+### HTML Export
+
+This will collate the `html` from every `segment` in all `chunks`, and create a single HTML file.
+
+<CodeGroup>
+  ```python Python
+  # Get HTML content as string
+  html = task.html()
+
+  # Or save directly to file
+  html = task.html(output_file="output/result.html")
+  ```
+</CodeGroup>
+
+### Markdown Export
+
+This will collate the `markdown` from every `segment` in all `chunks`, and create a single markdown file.
+
+<CodeGroup>
+  ```python Python
+  # Get markdown content as string
+  md = task.markdown()
+
+  # Or save directly to file
+  md = task.markdown(output_file="output/result.md")
+  ```
+</CodeGroup>
+
+### Text Export
+
+This will collate the `content` from every `segment` in all `chunks`, and create a single text file.
+
+<CodeGroup>
+  ```python Python
+  # Get plain text content as string
+  text = task.content()
+
+  # Or save directly to file
+  text = task.content(output_file="output/result.txt")
+  ```
+</CodeGroup>
+
+### JSON Export
+
+This will return the complete task data.
+
+<CodeGroup>
+  ```python Python
+  # Get complete task data as dictionary
+  json = task.json()
+
+  # Or save directly to file
+  json = task.json(output_file="output/result.json")
+  ```
+</CodeGroup>
+
+## File Output
+
+When using the `output_file` parameter:
+
+* Directories in the path will be created automatically if they don't exist
+* Files are written with UTF-8 encoding
+* Existing files will be overwritten
+
+Example with custom path:
+
+<CodeGroup>
+  ```python Python
+  # Create nested directory structure and save file
+  task.html(output_file="exports/2024/january/result.html")
+  ```
+</CodeGroup>
+
+
+# Installation
+Source: https://docs.chunkr.ai/sdk/installation
+
+
+
+### Step 1: Sign Up and Create an API Key
+
+1. Visit [Chunkr AI](https://chunkr.ai)
+2. Click on "Login" and create your account
+3. Once logged in, navigate to "API Keys" in the dashboard
+
+For self-hosted deployments:
+
+* [Docker Compose Setup Guide](https://github.com/lumina-ai-inc/chunkr?tab=readme-ov-file#quick-start-with-docker-compose)
+* [Kubernetes Setup Guide](https://github.com/lumina-ai-inc/chunkr/tree/main/kube)
+
+### Step 2: Install our client SDK
+
+<CodeGroup>
+  ```python Python
+  pip install chunkr-ai
+  ```
+</CodeGroup>
+
+### Step 3: Upload your document
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Initialize the Chunkr client with your API key - get this from https://chunkr.ai
+  chunkr = Chunkr(api_key="your_api_key")
+
+  # Upload a document via url or local file path
+  url = "https://chunkr-web.s3.us-east-1.amazonaws.com/landing_page/input/science.pdf"
+  task = chunkr.upload(url) 
+  ```
+</CodeGroup>
+
+### Step 4: Clean up
+
+You can clean up the open connections by calling the `close()` method on the `Chunkr` client.
+
+<CodeGroup>
+  ```python Python
+  chunkr.close()
+  ```
+</CodeGroup>
+
+## Environment Setup
+
+You can authenticate with the Chunkr AI API in two ways:
+
+1. **Direct API Key** - Pass your API key directly when initializing the client
+2. **Environment Variable** - Set `CHUNKR_API_KEY` in your `.env` file
+
+You can also configure the API endpoint:
+
+1. **Direct URL** - Pass your API URL when initializing the client
+2. **Environment Variable** - Set `CHUNKR_URL` in your `.env` file
+
+This is particularly useful if you're running a self-hosted version of Chunkr.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Option 1: Initialize with API key directly
+  chunkr = Chunkr(api_key="your_api_key")
+
+  # Option 2: Initialize without api_key parameter - will use CHUNKR_API_KEY from environment
+  chunkr = Chunkr()
+
+  # Option 3: Configure custom API endpoint
+  chunkr = Chunkr(api_key="your_api_key", chunkr_url="http://localhost:8000")
+
+  # Option 4: Use environment variables for both API key and URL
+  chunkr = Chunkr()  # will use CHUNKR_API_KEY and CHUNKR_URL from environment
+  ```
+</CodeGroup>
+
+
+# Polling the TaskResponse
+Source: https://docs.chunkr.ai/sdk/polling
+
+
+
+The Chunkr AI API follows a task-based pattern where you create a task and monitor its progress through polling.
+The `poll()` method handles this by automatically checking the task's status at regular intervals until it transitions out of the `Starting` or `Processing` states.
+
+After polling completes, it's important to verify the final task status, which will be one of:
+
+* `Succeeded`: Task completed successfully
+* `Failed`: Task encountered an error
+* `Cancelled`: Task was manually cancelled
+
+## Synchronous Usage
+
+When you have a `TaskResponse` object, you can poll it.
+Look at [creating](/sdk/data-operations/create) and [getting](/sdk/data-operations/get) a task for more information on how to get a `TaskResponse` object.
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Initialize client
+  chunkr = Chunkr()
+
+  try:
+      # Given that you already have a task object, you can poll it
+      task.poll()  
+      print(task.output.chunks)
+  finally:
+      # Clean up when done
+      chunkr.close()
+  ```
+</CodeGroup>
+
+## Asynchronous Usage
+
+For async applications, use `await`:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  import asyncio
+
+  async def process_document():
+      # Initialize client
+      chunkr = Chunkr()
+
+      try:
+          # Given that you already have a task object
+          await task.poll()  
+          print(task.output.chunks)
+      finally:
+          # Clean up when done
+          chunkr.close()
+  ```
+</CodeGroup>
+
+## Error Handling
+
+By default, failed tasks i.e. `task.status == "Failed"` will not raise exceptions. You can configure this behavior using the `raise_on_failure` parameter when initializing the client:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Initialize client with automatic error raising
+  chunkr = Chunkr(raise_on_failure=True)
+  ```
+</CodeGroup>
+
+
+# Using Chunkr AI SDK
+Source: https://docs.chunkr.ai/sdk/usage
+
+
+
+Chunkr AI's SDK supports both synchronous and asynchronous usage patterns.
+The same client class `Chunkr` can be used for both patterns, making it flexible for different application needs.
+All methods exists in both synchronous and asynchronous versions.
+
+## Synchronous Usage
+
+For simple scripts or applications that don't require asynchronous operations, you can use the synchronous pattern:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+
+  # Initialize client
+  chunkr = Chunkr()
+
+  try:
+      # Upload a file and wait for processing
+      task = chunkr.upload("document.pdf")
+      print(task.task_id)
+
+      # Alternatively, create task without waiting - you will get back a task object without chunks
+      task = chunkr.create_task("document.pdf")
+
+      # Poll the task when ready - this will wait for the task to complete and return a task object with chunks
+      task.poll()  
+      print(task.output.chunks)
+  finally:
+      # Clean up when done
+      chunkr.close()
+  ```
+</CodeGroup>
+
+## Asynchronous Usage
+
+For applications that benefit from asynchronous operations (like web servers or background tasks), you can use the async pattern:
+
+<CodeGroup>
+  ```python Python
+  from chunkr_ai import Chunkr
+  import asyncio
+
+  async def process_document():
+      # Initialize client
+      chunkr = Chunkr()
+
+      try:
+          # Upload a file and wait for processing
+          task = await chunkr.upload("document.pdf")
+          print(task.task_id)
+
+          # Alternatively, create task without waiting - you will get back a task object without chunks
+          task = await chunkr.create_task("document.pdf")
+
+          # Poll the task when ready - this will wait for the task to complete and return a task object with chunks
+          await task.poll()  
+          print(task.output.chunks)
+      finally:
+          # Clean up when done
+          chunkr.close()
+  ```
+</CodeGroup>
